@@ -250,12 +250,13 @@ int main(int argc, char *argv[])
         if (quiet) {
             resultDB.DumpOverall();
         } else {
+
             if (metricsfile.empty()) {
                 cout << endl;
                 resultDB.DumpSummary(cout);
             } else {
                 ofstream ofs;
-                ofs.open(metricsfile.c_str());
+                ofs.open(metricsfile.c_str(), std::ios_base::app);
                 resultDB.DumpCsv(metricsfile);
                 ofs.close();
             }
