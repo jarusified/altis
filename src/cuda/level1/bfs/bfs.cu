@@ -28,6 +28,15 @@
 #include "ResultDatabase.h"
 #include "OptionParser.h"
 
+// Include caliper instrumentation.
+#ifdef USE_CALIPER
+#include <caliper/cali.h>
+#include <caliper/cali_datatracker.h>
+#define MARK_FUNCTION CALI_CXX_MARK_FUNCTION
+#else
+#define MARK_FUNCTION 
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /// <summary>	A macro that defines Minimum nodes. (Unused) </summary>
 ///
@@ -254,6 +263,9 @@ void addBenchmarkSpecOptions(OptionParser &op) {
 void RunBenchmark(ResultDatabase &resultDB, OptionParser &op) {
     printf("Running BFS\n");
     int device;
+
+    MARK_FUNCTION;
+
     cudaGetDevice(&device);
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device);
@@ -261,17 +273,28 @@ void RunBenchmark(ResultDatabase &resultDB, OptionParser &op) {
     // seed random number generator
 	srand(SEED);
 
+    #ifdef USE_CALIPER
+    CALI_MARK_BEGIN("Initialize Graph data");
+    #endif
+
     int no_of_nodes = 0;
     int edge_list_size = 0;
     int source = 0;
 	Node* h_graph_nodes;
 	int* h_graph_edges;
+    CALI_DATATRACKER_TRACK(h_graph_nodes,   sizeof(Node)*no_of_nodes);
+    CALI_DATATRACKER_TRACK(h_graph_edges,   sizeof(int)*edge_list_size);
+
     initGraph(op, no_of_nodes, edge_list_size, source, h_graph_nodes, h_graph_edges);
 
     // atts string for result database
     char tmp[64];
     sprintf(tmp, "%dV,%dE", no_of_nodes, edge_list_size);
     string atts = string(tmp);
+
+    #ifdef USE_CALIPER
+    CALI_MARK_END("Initialize Graph data");
+    #endif
 
     bool quiet = op.getOptionBool("quiet");
     int passes = op.getOptionInt("passes");
@@ -281,6 +304,9 @@ void RunBenchmark(ResultDatabase &resultDB, OptionParser &op) {
     const bool uvm_prefetch = op.getOptionBool("uvm-prefetch");
     const bool uvm_prefetch_advise = op.getOptionBool("uvm-prefetch-advise");
 
+    #ifdef USE_CALIPER
+	CALI_CXX_MARK_LOOP_BEGIN(passesloop, "passes.loop");
+    #endif
     for (int i = 0; i < passes; i++) {
         if (!quiet) {
             printf("Pass %d:\n", i);
@@ -310,9 +336,14 @@ void RunBenchmark(ResultDatabase &resultDB, OptionParser &op) {
             }
         }
     }
+    #ifdef USE_CALIPER
+    CALI_CXX_MARK_LOOP_END(passesloop);
+    #endif
 
 	free( h_graph_nodes);
 	free( h_graph_edges);
+
+    CALI_MARK_FUNCTION_END;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -480,6 +511,12 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
     bool *h_graph_visited = (bool*) malloc(sizeof(bool)*no_of_nodes);
     assert(h_graph_visited);
 
+    #ifdef USE_CALIPER
+        CALI_DATATRACKER_TRACK(h_graph_mask,    sizeof(bool)*no_of_nodes);
+        CALI_DATATRACKER_TRACK(h_updating_graph_mask, sizeof(bool)*no_of_nodes);
+        CALI_DATATRACKER_TRACK(h_graph_visited, sizeof(bool)*no_of_nodes);
+    #endif
+
 	// initalize the memory
     for (int i = 0; i < no_of_nodes; i++) 
     {
@@ -495,6 +532,11 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
 	// allocate mem for the result on host side
     int *h_cost = (int*) malloc( sizeof(int)*no_of_nodes);
     assert(h_cost);
+
+    #ifdef USE_CALIPER
+    CALI_DATATRACKER_TRACK(h_cost, sizeof(int)*no_of_nodes);
+    #endif
+
 	for (int i=0;i<no_of_nodes;i++) {
 		h_cost[i]=-1;
     }
@@ -521,6 +563,17 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
 	CUDA_SAFE_CALL_NOEXIT(cudaMalloc( (void**) &d_graph_visited, sizeof(bool)*no_of_nodes));
 	CUDA_SAFE_CALL_NOEXIT(cudaMalloc( (void**) &d_cost, sizeof(int)*no_of_nodes));
 	CUDA_SAFE_CALL_NOEXIT(cudaMalloc( (void**) &d_over, sizeof(bool)));
+
+    #ifdef USE_CALIPER
+        CALI_DATATRACKER_TRACK(d_graph_nodes,   sizeof(Node)*no_of_nodes);
+        CALI_DATATRACKER_TRACK(d_graph_mask,    sizeof(bool)*no_of_nodes);
+        CALI_DATATRACKER_TRACK(d_updating_graph_mask, sizeof(bool)*no_of_nodes);
+        CALI_DATATRACKER_TRACK(d_updating_graph_mask, sizeof(bool)*no_of_nodes);
+        CALI_DATATRACKER_TRACK(d_graph_edges, sizeof(int)*edge_list_size);
+        CALI_DATATRACKER_TRACK(d_cost, sizeof(int)*no_of_nodes);
+        CALI_DATATRACKER_TRACK(d_over, sizeof(bool));
+    #endif
+
     cudaError_t err = cudaGetLastError();
     if(err != cudaSuccess) {
         free( h_graph_mask);
@@ -562,8 +615,15 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
 	int k=0;
 	bool stop;
 	//Call the Kernel untill all the elements of Frontier are not false
+    #ifdef USE_CALIPER
+    CALI_CXX_MARK_LOOP_BEGIN(mainloop, "bfs.loop");
+    #endif
 	do
 	{
+        #ifdef USE_CALIPER
+        CALI_CXX_MARK_LOOP_ITERATION(mainloop, k);
+        #endif
+
 		//if no thread changes this value then the loop stops
 		stop=false;
 		cudaMemcpy( d_over, &stop, sizeof(bool), cudaMemcpyHostToDevice) ;
@@ -590,7 +650,9 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
 		k++;
 	}
 	while (stop);
-
+    #ifdef USE_CALIPER
+    CALI_CXX_MARK_LOOP_END(mainloop);
+    #endif
     if (verbose) {
 	    printf("Kernel Executed %d times\n",k);
     }
@@ -635,7 +697,7 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
     resultDB.AddResult("bfs_rate_nodes", atts, "Nodes/s", no_of_nodes/kernelTime);
     resultDB.AddResult("bfs_rate_edges", atts, "Edges/s", edge_list_size/kernelTime);
     resultDB.AddResult("bfs_rate_parity", atts, "N", transferTime / kernelTime);
-    resultDB.AddOverall("Time", "sec", kernelTime+transferTime);
+    resultDB.AddResult("Time", atts, "sec", kernelTime+transferTime);
     return transferTime + kernelTime;
 }
 
@@ -680,6 +742,11 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
     }
     memcpy(graph_nodes, h_graph_nodes, sizeof(Node)*no_of_nodes);
 
+    #ifdef USE_CALIPER
+    CALI_DATATRACKER_TRACK(graph_nodes, sizeof(Node)*no_of_nodes);
+    CALI_DATATRACKER_TRACK(h_graph_nodes, sizeof(Node)*no_of_nodes);
+    #endif
+
     if (uvm) {
         // do nothing, graph_nodes remains on CPU
     } else if (uvm_prefetch) { 
@@ -702,6 +769,12 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
         checkCudaErrors(cudaMallocManaged(&graph_edges, sizeof(int)*edge_list_size));
     }
     memcpy(graph_edges, h_graph_edges, sizeof(int)*edge_list_size);
+
+    #ifdef USE_CALIPER
+    CALI_DATATRACKER_TRACK(graph_edges, sizeof(int)*edge_list_size);
+    CALI_DATATRACKER_TRACK(h_graph_edges, sizeof(int)*edge_list_size);
+    #endif 
+
     if (uvm) {
         // Do nothing, graph_edges remains on CPU
     } else if (uvm_prefetch) {
@@ -727,6 +800,12 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
         checkCudaErrors(cudaMallocManaged(&updating_graph_mask, sizeof(bool)*no_of_nodes));
         checkCudaErrors(cudaMallocManaged(&graph_visited, sizeof(bool)*no_of_nodes));
     }
+
+    #ifdef USE_CALIPER
+    CALI_DATATRACKER_TRACK(graph_mask,    sizeof(bool)*no_of_nodes);
+	CALI_DATATRACKER_TRACK(updating_graph_mask, sizeof(bool)*no_of_nodes);
+	CALI_DATATRACKER_TRACK(graph_visited, sizeof(bool)*no_of_nodes);
+    #endif
 
     for( int i = 0; i < no_of_nodes; i++) {
         graph_mask[i]=false;
@@ -789,6 +868,10 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
     }
     cost[source]=0;
     
+    #ifdef USE_CALIPER
+    CALI_DATATRACKER_TRACK(cost, sizeof(int)*no_of_nodes);
+    #endif
+
     if (uvm) {
         // Do nothing, cost stays on CPU
     } else if (uvm_advise) {
@@ -808,6 +891,9 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
     if (uvm || uvm_advise || uvm_prefetch || uvm_prefetch_advise) {
         checkCudaErrors(cudaMallocManaged(&over, sizeof(bool)));
     }
+    #ifdef USE_CALIPER
+    CALI_DATATRACKER_TRACK(over, sizeof(bool));
+    #endif
 
     // events for timing
     cudaEvent_t tstart, tstop;
@@ -822,9 +908,16 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
     double kernelTime = 0;
 	int k=0;
     bool stop;
+
+    #ifdef USE_CALIPER
+    CALI_CXX_MARK_LOOP_BEGIN(mainloop, "bfs.loop");
+    #endif
 	//Call the Kernel until all the elements of Frontier are not false
 	do
 	{
+        #ifdef USE_CALIPER
+            CALI_CXX_MARK_LOOP_ITERATION(mainloop, k);
+        #endif
         stop = false;
         *over = stop;
 
@@ -849,7 +942,10 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
 		k++;
 	}
 	while (stop);
-
+    #ifdef USE_CALIPER
+        CALI_CXX_MARK_LOOP_END(mainloop);
+    #endif
+    
     if (verbose && !quiet) {
         printf("Kernel Time: %f\n", kernelTime);
         printf("Kernel Executed %d times\n",k);
