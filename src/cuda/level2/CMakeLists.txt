@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.8)
 add_subdirectory(cfd)
 add_subdirectory(dwt2d)
 add_subdirectory(fdtd2d)
-add_subdirectory(kmeans)
+#add_subdirectory(kmeans)
 add_subdirectory(lavamd)
 add_subdirectory(mandelbrot)
 add_subdirectory(nw)
@@ -50,14 +50,14 @@ set_target_properties(fdtd2d
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/level2"
 )
 
-add_executable(kmeans ${exe_files})
-target_link_libraries(kmeans AltisCommon kmeansLib)
-set_target_properties(kmeans
-    PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/level2"
-)
+#add_executable(kmeans ${exe_files})
+#target_link_libraries(kmeans AltisCommon kmeansLib)
+#set_target_properties(kmeans
+#    PROPERTIES
+#    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+#    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+#    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/level2"
+#)
 
 add_executable(lavamd ${exe_files} lavamd/util/timer/timer.c)
 target_include_directories(lavamd PRIVATE lavamd/util)

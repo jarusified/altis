@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 set -ue
 
-LEVEL1_BENCH_PATH=/home/edwardhu/altis/src/cuda/level1/
-LEVEL1_NUM_BENCH=0
-LEVEL2_BENCH_PATH=/home/edwardhu/altis/src/cuda/level2/
+HOME=/g/g91/kesavan/altis/bin/
+LEVEL0_BENCH_PATH=${HOME}level0/
+LEVEL0_NUM_BENCH=4
+LEVEL1_BENCH_PATH=${HOME}level1/
+LEVEL1_NUM_BENCH=1
+LEVEL2_BENCH_PATH=${HOME}level2/
 LEVEL2_NUM_BENCH=8
+ALL_LEVEL0_BENCHMARKS=(busspeeddownload busspeedreadback devicememory maxflops)
 ALL_LEVEL1_BENCHMARKS=(sort)
 ALL_LEVEL2_BENCHMARKS=(cfd dwt2d kmeans lavamd mandelbrot nw particlefilter srad where)
 ALL_DNN_BENCHMARKS=(convolution dropout normalization rnn softmax)
 DNN_BENCH_NUM=4
-DNN_PATH=/home/edwardhu/altis/src/cuda/level2/darknet/
+DNN_PATH=${HOME}level2/yolo/
+
+NUM_BENCH=2
 
 profile_events_all () {
-    for i in $(seq 0 $NUM_BENCH)
+    for i in $(seq 0 $LEVEL0_NUM_BENCH)
     do
-        cd $BENCH_PATH${ALL_BENCHMARKS[$i]}
-        sudo /usr/local/cuda-10.0/bin/nvprof --profile-child-processes -e all --csv --log-file "%p" ./profile
-        #nvprof --profile-child-processes -e all --csv --log-file "%p" ./profile
-        echo ${ALL_BENCHMARKS[$i]}
+	echo ${ALL_LEVEL0_BENCHMARKS[$i]}
+        nvprof --profile-child-processes -e all --csv --log-file "%p" $LEVEL0_BENCH_PATH${ALL_LEVEL0_BENCHMARKS[$i]}
+
     done
 }
 
@@ -37,14 +42,14 @@ profile_metrics_all () {
     done
 
     # execute dnn kernel benchmark
-    for i in $(seq 0 $DNN_BENCH_NUM)
-    do
-        cd $DNN_PATH${ALL_DNN_BENCHMARKS[$i]}_forward
-        ./run_big
-
-        cd $DNN_PATH${ALL_DNN_BENCHMARKS[$i]}_backward
-        ./run_big
-    done
+    #for i in $(seq 0 $DNN_BENCH_NUM)
+    #do
+     #   cd $DNN_PATH${ALL_DNN_BENCHMARKS[$i]}_forward
+      #  ./run_big
+#
+ #       cd $DNN_PATH${ALL_DNN_BENCHMARKS[$i]}_backward
+  #      ./run_big
+   # done
 }
 
 profile_metrics_all_small_uvm () {
@@ -99,6 +104,6 @@ profile_metrics_all_big_uvm () {
     done
 }
 
-#profile_metrics_all
+profile_events_all
 #profile_metrics_all_small_uvm
-profile_metrics_all_big_uvm
+#profile_metrics_all_big_uvm

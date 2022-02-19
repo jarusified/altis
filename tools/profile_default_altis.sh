@@ -9,7 +9,7 @@ ALL_LEVEL1_BENCHMARKS=(sort)
 ALL_LEVEL2_BENCHMARKS=(cfd dwt2d kmeans lavamd mandelbrot nw particlefilter srad where)
 ALL_DNN_BENCHMARKS=(activation avgpool batchnorm connected convolution dropout normalization rnn softmax)
 DNN_BENCH_NUM=8
-DNN_PATH=/home/edwardhu/altis/src/cuda/level2/darknet/
+DNN_PATH=/home/edwardhu/altis/src/cuda/level2/yolo/
 
 profile_events_all () {
     for i in $(seq 0 $NUM_BENCH)

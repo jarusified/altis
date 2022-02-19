@@ -264,7 +264,11 @@ void RunBenchmark(ResultDatabase &resultDB, OptionParser &op) {
     printf("Running BFS\n");
     int device;
 
-    MARK_FUNCTION;
+    CALI_MARK_FUNCTION_BEGIN;
+
+    #ifdef USE_CALIPER
+    CALI_MARK_BEGIN("Initialize CUDA");
+    #endif
 
     cudaGetDevice(&device);
     cudaDeviceProp deviceProp;
@@ -272,6 +276,10 @@ void RunBenchmark(ResultDatabase &resultDB, OptionParser &op) {
 
     // seed random number generator
 	srand(SEED);
+
+    #ifdef USE_CALIPER
+    CALI_MARK_END("Initialize CUDA");
+    #endif
 
     #ifdef USE_CALIPER
     CALI_MARK_BEGIN("Initialize Graph data");
@@ -662,8 +670,15 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
 	cudaMemcpy(h_cost, d_cost, sizeof(int)*no_of_nodes, cudaMemcpyDeviceToHost);
     cudaEventRecord(tstop, 0);
     cudaEventSynchronize(tstop);
-    cudaEventElapsedTime(&elapsedTime, tstart, tstop);
-    transferTime += elapsedTime * 1.e-3; // convert to seconds
+    float oTransferTime = 0.0f;
+    cudaEventElapsedTime(&oTransferTime, tstart, tstop);
+    oTransferTime *= 1.e-3;
+
+    // Add the PCIe transfer time to total transfer time only once
+    if (first) {
+        transferTime += oTransferTime;
+        first = false;
+    }
 
 	//Store the result into a file
     string outfile = op.getOptionString("outputFile");
@@ -676,6 +691,9 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
     }
 
 	// cleanup memory
+    #ifdef USE_CALIPER
+        CALI_MARK_BEGIN("Cleanup vars");
+    #endif
 	free( h_graph_mask);
 	free( h_updating_graph_mask);
 	free( h_graph_visited);
@@ -687,10 +705,15 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
 	cudaFree(d_graph_visited);
 	cudaFree(d_cost);  
     cudaFree(d_over);
+    // Clean Up
+    #ifdef USE_CALIPER
+        CALI_MARK_END("Cleanup vars");
+    #endif
 
     char tmp[64];
     sprintf(tmp, "%dV,%dE", no_of_nodes, edge_list_size);
     string atts = string(tmp);
+    double pcieGflops = 2. * (no_of_nodes + no_of_edges) / (transferTime) / 1e9;
     resultDB.AddResult("bfs_transfer_time", atts, "sec", transferTime);
     resultDB.AddResult("bfs_kernel_time", atts, "sec", kernelTime);
     resultDB.AddResult("bfs_total_time", atts, "sec", transferTime + kernelTime);
@@ -698,6 +721,7 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
     resultDB.AddResult("bfs_rate_edges", atts, "Edges/s", edge_list_size/kernelTime);
     resultDB.AddResult("bfs_rate_parity", atts, "N", transferTime / kernelTime);
     resultDB.AddResult("Time", atts, "sec", kernelTime+transferTime);
+    resultDB.AddResult("GFlops_PCIe", atts, "GFlops", pcieGflops);
     return transferTime + kernelTime;
 }
 
@@ -762,6 +786,8 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
         std::cerr << "unrecognized uvm flag, exiting..." << std::endl;
         exit(-1);
     }
+    // CUDAMemPrefetchAsync does not work as people think it does. 
+    // cudaMallocManaged probably only pages the memory and 
 
     // copy graph edges to unified memory
     int* graph_edges = NULL;
@@ -908,7 +934,8 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
     double kernelTime = 0;
 	int k=0;
     bool stop;
-
+    
+    bool first = true;
     #ifdef USE_CALIPER
     CALI_CXX_MARK_LOOP_BEGIN(mainloop, "bfs.loop");
     #endif
@@ -970,8 +997,15 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
     }
     checkCudaErrors(cudaEventRecord(tstop, 0));
     checkCudaErrors(cudaEventSynchronize(tstop));
-    checkCudaErrors(cudaEventElapsedTime(&elapsedTime, tstart, tstop));
-    // transferTime += elapsedTime * 1.e-3; // convert to seconds
+    float oTransferTime = 0.0f;
+    checkCudaErrors(cudaEventElapsedTime(&oTransferTime, tstart, tstop));
+    oTransferTime *= 1.e-3;
+
+    // Add the PCIe transfer time to total transfer time only once
+    if (first) {
+        transferTime += oTransferTime;
+        first = false;
+    }
 
 	//Store the result into a file
     string outfile = op.getOptionString("outputFile");

@@ -21,6 +21,15 @@
 #include <sstream>
 #include <string>
 
+// Include caliper instrumentation.
+#ifdef USE_CALIPER
+#include <caliper/cali.h>
+#include <caliper/cali_datatracker.h>
+#define MARK_FUNCTION CALI_CXX_MARK_FUNCTION
+#else
+#define MARK_FUNCTION 
+#endif
+
 #define SEED 7
 /// <summary>	Length of the object field. </summary>
 static const int FIELD_LENGTH = 128;
@@ -156,11 +165,21 @@ void addBenchmarkSpecOptions(OptionParser &op) {}
 void RunBenchmark(ResultDatabase &resultDB, OptionParser &op) {
    cout << "Running GEMM" << endl;
   int device;
+  CALI_MARK_FUNCTION_BEGIN;
+
   cudaGetDevice(&device);
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, device);
+  
+  #ifdef USE_CALIPER
+    CALI_MARK_BEGIN("Initialize CUDA");
+  #endif
 
   srand(SEED);
+
+  #ifdef USE_CALIPER
+    CALI_MARK_END("Initialize CUDA");
+  #endif
 
   bool quiet = op.getOptionBool("quiet");
 
@@ -206,6 +225,9 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
   const bool uvm_prefetch_advise = op.getOptionBool("uvm-prefetch-advise");
   int kib;
 
+  #ifdef USE_CALIPER
+    CALI_MARK_BEGIN("Initialize Matrix data");
+  #endif
   // Use preset problem size or read data from input file
   string filename = op.getOptionString("inputFile");
   if (filename == "") {
@@ -221,6 +243,14 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
   // Dimensions of matrix
   int N = kib * 1024 / sizeof(T);
 
+  #ifdef USE_CALIPER
+    CALI_MARK_END("Initialize Matrix data");
+  #endif
+
+
+  #ifdef USE_CALIPER
+    CALI_MARK_END("Setup CUBLAS");
+  #endif
   // Initialize the cublas library
   cublasHandle_t handle; // CUBLAS context
   cublasStatus_t stat = cublasCreate(&handle);
@@ -228,6 +258,10 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
         std::cerr << "CUBLAS initialization failed" << std::endl;
         safe_exit(-1);
   }
+
+  #ifdef USE_CALIPER
+    CALI_MARK_END("Setup CUBLAS");
+  #endif
 
   // Allocate GPU memory
   T *dA, *dB, *dC;
@@ -239,12 +273,29 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
       checkCudaErrors(cudaMallocManaged(&dB, N * N* sizeof(T)));
       checkCudaErrors(cudaMallocManaged(&dC, N * N* sizeof(T)));
 
+      #ifdef USE_CALIPER
+        CALI_DATATRACKER_TRACK(dA, sizeof(T)* N * N);
+        CALI_DATATRACKER_TRACK(dA, sizeof(T)* N * N);
+      #endif
+
       if (filename == "") {
+          #ifdef USE_CALIPER
+            CALI_MARK_BEGIN("Fill matrix (file)");
+          #endif
           fill<T>(dA, N * N, 31);
           fill<T>(dB, N * N, 31);
           fill<T>(dC, N * N, 31);
+          #ifdef USE_CALIPER
+            CALI_MARK_END("Fill matrix (file)");
+          #endif
       } else {
+          #ifdef USE_CALIPER
+            CALI_MARK_BEGIN("Read matrix (file)");
+          #endif
           readMatrix(dA, dB, dC, N * N, filename);
+          #ifdef USE_CALIPER
+            CALI_MARK_END("Read matrix (file)");
+          #endif
       }
   }
   else {
@@ -312,8 +363,27 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
 
   bool first = true;
 /// <summary>	. </summary>
+  #ifdef USE_CALIPER
+  	CALI_CXX_MARK_LOOP_BEGIN(passesloop, "passes.loop");
+  #endif
   for (int j = 0; j < passes; j++) {
+    #ifdef USE_CALIPER
+      CALI_CXX_MARK_LOOP_BEGIN(cublas_n_loop, "cublas_t.loop");
+    #endif
+    #ifdef USE_CALIPER
+      CALI_CXX_MARK_LOOP_BEGIN(cublas_t_loop, "cublas_n.loop");
+    #endif
     for (int i = 0; i < 2; i++) {
+      
+      if(i == 0) {
+        #ifdef USE_CALIPER
+          CALI_CXX_MARK_LOOP_ITERATION(cublas_t_loop, j);
+        #endif
+      } else {
+        #ifdef USE_CALIPER
+          CALI_CXX_MARK_LOOP_ITERATION(cublas_n_loop, j);
+        #endif
+      }
       const cublasOperation_t transa = CUBLAS_OP_N;
       const cublasOperation_t transb = i ? CUBLAS_OP_T : CUBLAS_OP_N;
       const int nb = 128;
@@ -393,22 +463,48 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
       resultDB.AddResult(testName + "-" + transb_string + "_Parity", atts, "N", transferTime / cublasTime);
       resultDB.AddOverall("GFlops", "", cublasGflops);
     }
+    if(i == 0) {
+        #ifdef USE_CALIPER
+          CALI_CXX_MARK_LOOP_END(cublas_t_loop);
+        #endif
+      } else {
+        #ifdef USE_CALIPER
+          CALI_CXX_MARK_LOOP_END(cublas_n_loop);
+        #endif
+      }
   }
+  #ifdef USE_CALIPER
+    CALI_CXX_MARK_LOOP_END(passesloop);
+  #endif
 
   // Clean Up
-
+  #ifdef USE_CALIPER
+    CALI_MARK_BEGIN("Cleanup vars");
+  #endif
   checkCudaErrors(cudaFree(dA));
   checkCudaErrors(cudaFree(dB));
   checkCudaErrors(cudaFree(dC));
+  #ifdef USE_CALIPER
+    CALI_MARK_END("Cleanup vars");
+  #endif
+
   if (!uvm && !uvm_prefetch && !uvm_advise && !uvm_prefetch_advise) {
+    #ifdef USE_CALIPER
+      CALI_MARK_BEGIN("Cleanup vars");
+    #endif
     checkCudaErrors(cudaFreeHost(A));
     checkCudaErrors(cudaFreeHost(B));
     checkCudaErrors(cudaFreeHost(C));
+    #ifdef USE_CALIPER
+      CALI_MARK_END("Cleanup vars");
+    #endif
   }
 
   checkCudaErrors(cudaEventDestroy(start));
   checkCudaErrors(cudaEventDestroy(stop));
   cublasDestroy(handle);
+
+  CALI_MARK_FUNCTION_END;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

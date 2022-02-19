@@ -8,7 +8,7 @@
 device_index=${1:-0}
 timestamp=$(date +%s.%N)
 gcc_binary=${CMAKE_CXX_COMPILER:-$(which c++)}
-cuda_root=${CUDA_DIR:-/usr/local/cuda}
+cuda_root=${CUDA_DIR:/home/suraj/Work/llnl/spack/opt/spack/linux-ubuntu20.04-skylake/gcc-9.3.0/cuda-11.1.0-5zknzvukfvdi2ihfhj25fcqj4gktqesr}
 CUDA_INCLUDE_DIRS=${CUDA_INCLUDE_DIRS:-${cuda_root}/include}
 CUDA_CUDART_LIBRARY=${CUDA_CUDART_LIBRARY:-${cuda_root}/lib64/libcudart.so}
 generated_binary="/tmp/cuda-compute-version-helper-$$-$timestamp"

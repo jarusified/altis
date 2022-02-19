@@ -8,7 +8,7 @@ all_level1_bench = ['bfs','gemm','pathfinder','sort']
 all_level2_bench = ['cfd','dwt2d','gups','kmeans','lavamd','mandelbrot','nw','particlefilter','srad','where', "raytracing"]
 all_dnn_bench = ['activation','avgpool','batchnorm','connected','convolution','dropout','normalization','rnn','softmax']
 
-metrics_path = '/home/edwardhu/altis/src/cuda/'
+metrics_path = '/g/g91/kesavan/altis/src/cuda/'
 level1_metrics_path = metrics_path + 'level1/'
 level2_metrics_path = metrics_path + 'level2/'
 dnn_metrics_path = metrics_path + 'level2/' + 'darknet/'
@@ -112,16 +112,6 @@ def main():
                 writer.writerow(result)
             else:
                 writer.writerow(result)
-
-
-
-
-
-
-
-            # for key in result:
-            #     print(key, "    ", result[key])
-
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 
 add_subdirectory(bfs)
-add_subdirectory(gemm)
+#add_subdirectory(gemm)
 add_subdirectory(pathfinder)
 add_subdirectory(sort)
 add_subdirectory(gups)
@@ -15,14 +15,14 @@ set_target_properties(bfs
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/level1"
 )
 
-add_executable(gemm ${exe_files})
-target_link_libraries(gemm AltisCommon gemmLib)
-set_target_properties(gemm
-    PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/level1"
-)
+#add_executable(gemm ${exe_files})
+#target_link_libraries(gemm AltisCommon gemmLib)
+#set_target_properties(gemm
+#    PROPERTIES
+#    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+#    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+#    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/level1"
+#)
 
 add_executable(pathfinder ${exe_files})
 target_link_libraries(pathfinder AltisCommon pathfinderLib)

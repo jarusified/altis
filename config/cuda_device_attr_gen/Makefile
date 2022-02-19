@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,9 +32,9 @@
 ################################################################################
 
 # Location of the CUDA Toolkit
-CUDA_PATH ?= /usr/local/cuda
+CUDA_HOME ?= /home/suraj/Work/llnl/spack/opt/spack/linux-ubuntu20.04-skylake/gcc-9.3.0/cuda-11.1.0-5zknzvukfvdi2ihfhj25fcqj4gktqesr
 
-##############################
+############################
 # start deprecated interface #
 ##############################
 ifeq ($(x86_64),1)
@@ -88,7 +88,7 @@ endif
 
 # sbsa and aarch64 systems look similar. Need to differentiate them at host level for now.
 ifeq ($(HOST_ARCH),aarch64)
-    ifeq ($(CUDA_PATH)/targets/sbsa-linux,$(shell ls -1d $(CUDA_PATH)/targets/sbsa-linux 2>/dev/null))
+    ifeq ($(CUDA_HOME/targets/sbsa-linux,$(shell ls -1d $(CUDA_HOME)/targets/sbsa-linux 2>/dev/null))
         HOST_ARCH := sbsa
         TARGET_ARCH := sbsa
     endif
@@ -156,17 +156,17 @@ else ifneq ($(TARGET_ARCH),$(HOST_ARCH))
         HOST_COMPILER ?= powerpc64le-linux-gnu-g++
     endif
 endif
-HOST_COMPILER ?= g++
-NVCC          := $(CUDA_PATH)/bin/nvcc -ccbin $(HOST_COMPILER)
+HOST_COMPILER ?= g++ -std=c++11
+NVCC          := nvcc -ccbin $(HOST_COMPILER)
 
 # internal flags
-NVCCFLAGS   := -m${TARGET_SIZE}
+NVCCFLAGS   :=
 CCFLAGS     :=
 LDFLAGS     :=
 
 # build flags
 ifeq ($(TARGET_OS),darwin)
-    LDFLAGS += -rpath $(CUDA_PATH)/lib
+    LDFLAGS += -rpath $(CUDA_HOME)/lib
     CCFLAGS += -arch $(HOST_ARCH)
 else ifeq ($(HOST_ARCH)-$(TARGET_ARCH)-$(TARGET_OS),x86_64-armv7l-linux)
     LDFLAGS += --dynamic-linker=/lib/ld-linux-armhf.so.3
@@ -272,6 +272,7 @@ ALL_LDFLAGS += $(addprefix -Xlinker ,$(EXTRA_LDFLAGS))
 
 # Common includes and paths for CUDA
 INCLUDES  := -I../../Common
+# INCLUDS := 
 LIBRARIES :=
 
 ################################################################################
@@ -323,10 +324,10 @@ else
 endif
 
 deviceQuery.o:deviceQuery.cpp
-	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) -o $@ -c $<
 
 deviceQuery: deviceQuery.o
-	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+	$(EXEC) $(NVCC) $(ALL_LDFLAGS) -o $@ $+ $(LIBRARIES)
 	$(EXEC) mkdir -p ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
 	$(EXEC) cp $@ ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
 
