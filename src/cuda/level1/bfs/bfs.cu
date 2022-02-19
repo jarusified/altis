@@ -674,6 +674,7 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
     cudaEventElapsedTime(&oTransferTime, tstart, tstop);
     oTransferTime *= 1.e-3;
 
+    bool first = true;
     // Add the PCIe transfer time to total transfer time only once
     if (first) {
         transferTime += oTransferTime;
@@ -713,7 +714,7 @@ float BFSGraph(ResultDatabase &resultDB, OptionParser &op, int no_of_nodes, int 
     char tmp[64];
     sprintf(tmp, "%dV,%dE", no_of_nodes, edge_list_size);
     string atts = string(tmp);
-    double pcieGflops = 2. * (no_of_nodes + no_of_edges) / (transferTime) / 1e9;
+    double pcieGflops = 2. * (no_of_nodes + edge_list_size) / (transferTime) / 1e9;
     resultDB.AddResult("bfs_transfer_time", atts, "sec", transferTime);
     resultDB.AddResult("bfs_kernel_time", atts, "sec", kernelTime);
     resultDB.AddResult("bfs_total_time", atts, "sec", transferTime + kernelTime);
@@ -1003,7 +1004,7 @@ float BFSGraphUnifiedMemory(ResultDatabase &resultDB, OptionParser &op, int no_o
 
     // Add the PCIe transfer time to total transfer time only once
     if (first) {
-        transferTime += oTransferTime;
+        elapsedTime += oTransferTime;
         first = false;
     }
 

@@ -462,7 +462,6 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
       resultDB.AddResult(testName + "-" + transb_string + "_PCIe", atts, "GFlops", pcieGflops);
       resultDB.AddResult(testName + "-" + transb_string + "_Parity", atts, "N", transferTime / cublasTime);
       resultDB.AddOverall("GFlops", "", cublasGflops);
-    }
     if(i == 0) {
         #ifdef USE_CALIPER
           CALI_CXX_MARK_LOOP_END(cublas_t_loop);
@@ -472,6 +471,7 @@ void RunTest(string testName, ResultDatabase &resultDB, OptionParser &op) {
           CALI_CXX_MARK_LOOP_END(cublas_n_loop);
         #endif
       }
+    }
   }
   #ifdef USE_CALIPER
     CALI_CXX_MARK_LOOP_END(passesloop);
